@@ -1,10 +1,16 @@
+package com.kitchen;
+
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+
 import java.io.IOException;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -17,6 +23,8 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
 public class Main {
+    private static final ObjectMapper MAPPER = new ObjectMapper();
+
     public static void main(String[] args) throws Exception {
         Map<String, String> cli = parseArgs(args);
         String ordersUrl = required(cli, "ordersUrl");
@@ -55,7 +63,6 @@ public class Main {
             }, pickupDelaySeconds, TimeUnit.SECONDS);
         }, 0, placeEveryMillis, TimeUnit.MILLISECONDS);
 
-        // Stop placing once all orders have been scheduled.
         scheduler.scheduleWithFixedDelay(() -> {
             if (index.get() >= orders.size()) {
                 placeFuture.cancel(false);
@@ -71,8 +78,7 @@ public class Main {
             throw new IllegalStateException("Timed out waiting for pickups (" + maxAwaitSeconds + "s)");
         }
 
-        List<Action> actions = kitchen.getLedgerSnapshot();
-        postSolution(http, solveUrl, actions);
+        postSolution(http, solveUrl, kitchen.getLedgerSnapshot());
     }
 
     private static List<Order> fetchOrders(HttpClient http, String ordersUrl) throws IOException, InterruptedException {
@@ -87,54 +93,33 @@ public class Main {
             throw new IllegalStateException("GET orders failed: HTTP " + resp.statusCode());
         }
 
-        Object root = Json.parse(resp.body());
-        Object ordersNode = root;
-        if (root instanceof Map<?, ?>) {
-            @SuppressWarnings("unchecked")
-            Map<String, Object> map = (Map<String, Object>) root;
-            if (map.containsKey("orders")) {
-                ordersNode = map.get("orders");
-            }
-        }
-
-        if (!(ordersNode instanceof List<?>)) {
+        JsonNode root = MAPPER.readTree(resp.body());
+        JsonNode ordersNode = root.isObject() ? root.get("orders") : root;
+        if (ordersNode == null || !ordersNode.isArray()) {
             throw new IllegalArgumentException("Orders payload must be an array (or {\"orders\": [...]})");
         }
 
-        @SuppressWarnings("unchecked")
-        List<Object> raw = (List<Object>) ordersNode;
-        List<Order> orders = new ArrayList<>(raw.size());
-        for (Object o : raw) {
-            if (!(o instanceof Map<?, ?>)) {
-                continue;
-            }
-            @SuppressWarnings("unchecked")
-            Map<String, Object> m = (Map<String, Object>) o;
-            orders.add(orderFromMap(m));
+        // Try direct binding first; many APIs use {id,name,temp,shelfLife,decayRate}
+        try {
+            return MAPPER.convertValue(ordersNode, new TypeReference<List<Order>>() {
+            });
+        } catch (IllegalArgumentException ignored) {
+            // Fall back to manual mapping for alternate field names.
         }
-        return orders;
+
+        return MAPPER.convertValue(ordersNode, new TypeReference<List<Map<String, Object>>>() {
+        }).stream().map(Main::orderFromMap).toList();
     }
 
     private static void postSolution(HttpClient http, String solveUrl, List<Action> actions) throws IOException, InterruptedException {
-        List<Object> actionsJson = new ArrayList<>(actions.size());
-        for (Action a : actions) {
-            Map<String, Object> m = new HashMap<>();
-            m.put("timestampMicros", a.getTimestampMicros());
-            m.put("orderId", a.getOrderId());
-            m.put("action", a.getAction());
-            m.put("target", a.getTarget());
-            actionsJson.add(m);
-        }
+        ObjectNode payload = MAPPER.createObjectNode();
+        payload.set("actions", MAPPER.valueToTree(actions));
 
-        Map<String, Object> payload = new HashMap<>();
-        payload.put("actions", actionsJson);
-
-        String body = Json.stringify(payload);
         HttpRequest request = HttpRequest.newBuilder()
                 .uri(URI.create(solveUrl))
                 .timeout(Duration.ofSeconds(20))
                 .header("Content-Type", "application/json")
-                .POST(HttpRequest.BodyPublishers.ofString(body))
+                .POST(HttpRequest.BodyPublishers.ofString(MAPPER.writeValueAsString(payload)))
                 .build();
 
         HttpResponse<String> resp = http.send(request, HttpResponse.BodyHandlers.ofString());
@@ -152,6 +137,7 @@ public class Main {
         if (name == null || name.isBlank()) {
             throw new IllegalArgumentException("Order missing name for id=" + id);
         }
+
         Order.Temperature temp = parseTemperature(asString(firstNonNull(m, "temp", "temperature")));
         int shelfLifeSeconds = asInt(firstNonNull(m, "shelfLifeSeconds", "shelfLife", "shelfLifeSec"));
         double decayRate = asDouble(firstNonNull(m, "decayRate", "decay_rate"));
@@ -240,3 +226,4 @@ public class Main {
         return v;
     }
 }
+

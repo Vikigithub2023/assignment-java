@@ -1,3 +1,5 @@
+package com.kitchen;
+
 public enum StorageType {
     HEATER,
     COOLER,
@@ -22,3 +24,4 @@ public enum StorageType {
         }
     }
 }
+

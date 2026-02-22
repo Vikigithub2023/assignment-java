@@ -1,3 +1,5 @@
+package com.kitchen;
+
 public class Action {
     private final long timestampMicros;
     private final String orderId;
@@ -37,3 +39,4 @@ public class Action {
                 '}';
     }
 }
+

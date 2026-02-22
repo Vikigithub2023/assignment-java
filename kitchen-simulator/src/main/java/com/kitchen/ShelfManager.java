@@ -1,3 +1,5 @@
+package com.kitchen;
+
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.Map;
@@ -50,7 +52,6 @@ public class ShelfManager {
                 continue;
             }
 
-            // Ensure we don't return an entry that has already expired by time.
             if (next.isExpired(nowMicros)) {
                 orderMap.remove(next.getOrder().getId());
                 continue;
@@ -112,3 +113,4 @@ public class ShelfManager {
         return TimeUnit.NANOSECONDS.toMicros(System.nanoTime());
     }
 }
+

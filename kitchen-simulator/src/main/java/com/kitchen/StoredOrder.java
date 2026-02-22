@@ -1,3 +1,5 @@
+package com.kitchen;
+
 import java.util.Objects;
 
 public class StoredOrder {
@@ -108,3 +110,4 @@ public class StoredOrder {
                 '}';
     }
 }
+
