@@ -20,6 +20,15 @@ public class Kitchen {
     private final Map<String, StoredOrder> allOrders = new HashMap<>();
     private final List<Action> ledger = new ArrayList<>();
 
+    public List<Action> getLedgerSnapshot() {
+        lock.lock();
+        try {
+            return new ArrayList<>(ledger);
+        } finally {
+            lock.unlock();
+        }
+    }
+
     public void placeOrder(Order order) {
         if (order == null) {
             throw new IllegalArgumentException("order cannot be null");
