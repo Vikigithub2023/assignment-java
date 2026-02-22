@@ -37,7 +37,7 @@ public class Kitchen {
                     StoredOrder storedOrder = new StoredOrder(order, idealStorage, nowMicros);
                     idealList.add(storedOrder);
                     allOrders.put(order.getId(), storedOrder);
-                    ledger.add(new Action(Action.Type.PLACE, order.getId(), null, idealStorage, nowMicros));
+                    ledger.add(new Action(nowMicros, order.getId(), "place", idealStorage.name()));
                     return;
                 }
 
@@ -45,7 +45,7 @@ public class Kitchen {
                     StoredOrder storedOrder = new StoredOrder(order, StorageType.SHELF, nowMicros);
                     shelf.addOrder(storedOrder);
                     allOrders.put(order.getId(), storedOrder);
-                    ledger.add(new Action(Action.Type.PLACE, order.getId(), null, StorageType.SHELF, nowMicros));
+                    ledger.add(new Action(nowMicros, order.getId(), "place", StorageType.SHELF.name()));
                     return;
                 }
 
@@ -79,13 +79,13 @@ public class Kitchen {
 
             if (storageType == StorageType.SHELF) {
                 shelf.removeOrder(orderId);
-                ledger.add(new Action(Action.Type.PICKUP, orderId, StorageType.SHELF, null, nowMicros));
+                ledger.add(new Action(nowMicros, orderId, "pickup", StorageType.SHELF.name()));
                 return;
             }
 
             removeFromListById(storageList(storageType), orderId);
             storedOrder.deactivate();
-            ledger.add(new Action(Action.Type.PICKUP, orderId, storageType, null, nowMicros));
+            ledger.add(new Action(nowMicros, orderId, "pickup", storageType.name()));
         } finally {
             lock.unlock();
         }
@@ -99,7 +99,7 @@ public class Kitchen {
         }
 
         allOrders.remove(discarded.getOrder().getId());
-        ledger.add(new Action(Action.Type.DISCARD, discarded.getOrder().getId(), StorageType.SHELF, null, nowMicros));
+        ledger.add(new Action(nowMicros, discarded.getOrder().getId(), "discard", StorageType.SHELF.name()));
     }
 
     private boolean tryMoveShelfOrder(StorageType targetStorage) {
@@ -158,7 +158,7 @@ public class Kitchen {
 
         targetList.add(moved);
         allOrders.put(orderId, moved);
-        ledger.add(new Action(Action.Type.MOVE, orderId, StorageType.SHELF, targetStorage, nowMicros));
+        ledger.add(new Action(nowMicros, orderId, "move", targetStorage.name()));
         return true;
     }
 
