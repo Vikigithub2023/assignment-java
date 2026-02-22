@@ -15,6 +15,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
@@ -26,65 +27,140 @@ import java.util.stream.Collectors;
 public class Main {
     private static final ObjectMapper MAPPER = new ObjectMapper();
 
-    public static void main(String[] args) throws Exception {
+    public static void main(String[] args) {
+        int code = run(args);
+        if (code != 0) {
+            System.exit(code);
+        }
+    }
+
+    private static int run(String[] args) {
         Map<String, String> cli = parseArgs(args);
-        String ordersUrl = required(cli, "ordersUrl");
-        String solveUrl = required(cli, "solveUrl");
+        String ordersUrl;
+        String solveUrl;
+        try {
+            ordersUrl = required(cli, "ordersUrl");
+            solveUrl = required(cli, "solveUrl");
+        } catch (IllegalArgumentException e) {
+            System.err.println(e.getMessage());
+            printUsage();
+            return 2;
+        }
 
         long placeEveryMillis = Long.parseLong(cli.getOrDefault("placeEveryMillis", "500"));
         long maxAwaitSeconds = Long.parseLong(cli.getOrDefault("awaitSeconds", "60"));
 
-        HttpClient http = HttpClient.newBuilder()
-                .connectTimeout(Duration.ofSeconds(10))
-                .build();
-
-        List<Order> orders = fetchOrders(http, ordersUrl);
-        Kitchen kitchen = new Kitchen();
-
-        CountDownLatch latch = new CountDownLatch(orders.size());
-        ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(8);
-        AtomicInteger index = new AtomicInteger(0);
-
-        ScheduledFuture<?> placeFuture = scheduler.scheduleAtFixedRate(() -> {
-            int i = index.getAndIncrement();
-            if (i >= orders.size()) {
-                return;
-            }
-
-            Order order = orders.get(i);
-            kitchen.placeOrder(order);
-
-            long pickupDelaySeconds = ThreadLocalRandom.current().nextLong(4, 9); // 4–8 inclusive
-            scheduler.schedule(() -> {
-                try {
-                    kitchen.pickupOrder(order.getId());
-                } finally {
-                    latch.countDown();
-                }
-            }, pickupDelaySeconds, TimeUnit.SECONDS);
-        }, 0, placeEveryMillis, TimeUnit.MILLISECONDS);
-
-        scheduler.scheduleWithFixedDelay(() -> {
-            if (index.get() >= orders.size()) {
-                placeFuture.cancel(false);
-            }
-        }, 0, 50, TimeUnit.MILLISECONDS);
-
-        boolean done = latch.await(maxAwaitSeconds, TimeUnit.SECONDS);
-        placeFuture.cancel(false);
-        scheduler.shutdown();
-        scheduler.awaitTermination(10, TimeUnit.SECONDS);
-
-        if (!done) {
-            throw new IllegalStateException("Timed out waiting for pickups (" + maxAwaitSeconds + "s)");
+        URI ordersUri;
+        URI solveUri;
+        try {
+            ordersUri = parseHttpUri(ordersUrl, "ordersUrl");
+            solveUri = parseHttpUri(solveUrl, "solveUrl");
+        } catch (IllegalArgumentException e) {
+            System.err.println(e.getMessage());
+            printUsage();
+            return 2;
         }
 
-        postSolution(http, solveUrl, kitchen.getLedgerSnapshot());
+        ExecutorService httpExecutor = Executors.newFixedThreadPool(4, r -> {
+            Thread t = new Thread(r, "http-client");
+            t.setDaemon(true);
+            return t;
+        });
+
+        try {
+            HttpClient http = HttpClient.newBuilder()
+                    .connectTimeout(Duration.ofSeconds(10))
+                    .executor(httpExecutor)
+                    .build();
+
+            List<Order> orders;
+            try {
+                orders = fetchOrders(http, ordersUri);
+            } catch (IOException e) {
+                System.err.println("Failed to fetch orders: " + e.getMessage());
+                System.err.println("Is the server running and listening on that host/port?");
+                return 1;
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                System.err.println("Interrupted while fetching orders.");
+                return 1;
+            } catch (RuntimeException e) {
+                System.err.println("Failed to fetch orders: " + e.getMessage());
+                return 1;
+            }
+
+            Kitchen kitchen = new Kitchen();
+
+            CountDownLatch latch = new CountDownLatch(orders.size());
+            ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(8);
+            try {
+                AtomicInteger index = new AtomicInteger(0);
+
+                ScheduledFuture<?> placeFuture = scheduler.scheduleAtFixedRate(() -> {
+                    int i = index.getAndIncrement();
+                    if (i >= orders.size()) {
+                        return;
+                    }
+
+                    Order order = orders.get(i);
+                    kitchen.placeOrder(order);
+
+                    long pickupDelaySeconds = ThreadLocalRandom.current().nextLong(4, 9); // 4–8 inclusive
+                    scheduler.schedule(() -> {
+                        try {
+                            kitchen.pickupOrder(order.getId());
+                        } finally {
+                            latch.countDown();
+                        }
+                    }, pickupDelaySeconds, TimeUnit.SECONDS);
+                }, 0, placeEveryMillis, TimeUnit.MILLISECONDS);
+
+                scheduler.scheduleWithFixedDelay(() -> {
+                    if (index.get() >= orders.size()) {
+                        placeFuture.cancel(false);
+                    }
+                }, 0, 50, TimeUnit.MILLISECONDS);
+
+                boolean done = latch.await(maxAwaitSeconds, TimeUnit.SECONDS);
+                placeFuture.cancel(false);
+                scheduler.shutdown();
+                scheduler.awaitTermination(10, TimeUnit.SECONDS);
+
+                if (!done) {
+                    System.err.println("Timed out waiting for pickups (" + maxAwaitSeconds + "s)");
+                    return 1;
+                }
+
+                try {
+                    postSolution(http, solveUri, kitchen.getLedgerSnapshot());
+                } catch (IOException e) {
+                    System.err.println("Failed to post solution: " + e.getMessage());
+                    return 1;
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    System.err.println("Interrupted while posting solution.");
+                    return 1;
+                } catch (RuntimeException e) {
+                    System.err.println("Failed to post solution: " + e.getMessage());
+                    return 1;
+                }
+
+                return 0;
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                System.err.println("Interrupted while running simulation.");
+                return 1;
+            } finally {
+                scheduler.shutdownNow();
+            }
+        } finally {
+            httpExecutor.shutdownNow();
+        }
     }
 
-    private static List<Order> fetchOrders(HttpClient http, String ordersUrl) throws IOException, InterruptedException {
+    private static List<Order> fetchOrders(HttpClient http, URI ordersUri) throws IOException, InterruptedException {
         HttpRequest request = HttpRequest.newBuilder()
-                .uri(URI.create(ordersUrl))
+                .uri(ordersUri)
                 .timeout(Duration.ofSeconds(20))
                 .GET()
                 .build();
@@ -112,12 +188,12 @@ public class Main {
         }).stream().map(Main::orderFromMap).collect(Collectors.toList());
     }
 
-    private static void postSolution(HttpClient http, String solveUrl, List<Action> actions) throws IOException, InterruptedException {
+    private static void postSolution(HttpClient http, URI solveUri, List<Action> actions) throws IOException, InterruptedException {
         ObjectNode payload = MAPPER.createObjectNode();
         payload.set("actions", MAPPER.valueToTree(actions));
 
         HttpRequest request = HttpRequest.newBuilder()
-                .uri(URI.create(solveUrl))
+                .uri(solveUri)
                 .timeout(Duration.ofSeconds(20))
                 .header("Content-Type", "application/json")
                 .POST(HttpRequest.BodyPublishers.ofString(MAPPER.writeValueAsString(payload)))
@@ -222,8 +298,57 @@ public class Main {
     private static String required(Map<String, String> cli, String key) {
         String v = cli.get(key);
         if (v == null || v.isBlank()) {
-            throw new IllegalArgumentException("Missing required arg --" + key);
+            v = System.getProperty(key);
+        }
+        if (v == null || v.isBlank()) {
+            v = System.getenv(toEnvKey(key));
+        }
+        if (v == null || v.isBlank()) {
+            throw new IllegalArgumentException("Missing required arg --" + key + " (or -D" + key + "=... or $" + toEnvKey(key) + ")");
         }
         return v;
+    }
+
+    private static URI parseHttpUri(String raw, String label) {
+        if (raw == null || raw.isBlank()) {
+            throw new IllegalArgumentException("Missing " + label);
+        }
+
+        URI uri;
+        try {
+            uri = URI.create(raw.trim());
+        } catch (IllegalArgumentException e) {
+            throw new IllegalArgumentException("Invalid " + label + " URI: " + raw);
+        }
+
+        String scheme = uri.getScheme();
+        if (scheme == null || !(scheme.equalsIgnoreCase("http") || scheme.equalsIgnoreCase("https"))) {
+            throw new IllegalArgumentException(label + " must start with http:// or https:// (got: " + raw + ")");
+        }
+        if (uri.getHost() == null) {
+            throw new IllegalArgumentException(label + " must include a hostname (example: http://localhost:8080/orders)");
+        }
+        return uri;
+    }
+
+    private static String toEnvKey(String key) {
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < key.length(); i++) {
+            char c = key.charAt(i);
+            if (Character.isUpperCase(c)) {
+                sb.append('_').append(c);
+            } else {
+                sb.append(Character.toUpperCase(c));
+            }
+        }
+        return sb.toString();
+    }
+
+    private static void printUsage() {
+        System.err.println("Usage:");
+        System.err.println("  mvn -q exec:java -DordersUrl=http://localhost:8081/orders -DsolveUrl=http://localhost:8081/solve");
+        System.err.println("  mvn -q exec:java -Dexec.args=\"--ordersUrl http://localhost:8081/orders --solveUrl http://localhost:8081/solve\"");
+        System.err.println("Env vars:");
+        System.err.println("  ORDERS_URL, SOLVE_URL");
     }
 }
