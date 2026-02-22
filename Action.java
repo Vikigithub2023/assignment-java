@@ -1,53 +1,39 @@
 public class Action {
-    public enum Type {
-        PLACE,
-        PICKUP,
-        MOVE,
-        DISCARD
-    }
-
-    private final Type type;
+    private final long timestampMicros;
     private final String orderId;
-    private final StorageType from;
-    private final StorageType to;
-    private final long timeMicros;
+    private final String action;
+    private final String target;
 
-    public Action(Type type, String orderId, StorageType from, StorageType to, long timeMicros) {
-        this.type = type;
+    public Action(long timestampMicros, String orderId, String action, String target) {
+        this.timestampMicros = timestampMicros;
         this.orderId = orderId;
-        this.from = from;
-        this.to = to;
-        this.timeMicros = timeMicros;
+        this.action = action;
+        this.target = target;
     }
 
-    public Type getType() {
-        return type;
+    public long getTimestampMicros() {
+        return timestampMicros;
     }
 
     public String getOrderId() {
         return orderId;
     }
 
-    public StorageType getFrom() {
-        return from;
+    public String getAction() {
+        return action;
     }
 
-    public StorageType getTo() {
-        return to;
-    }
-
-    public long getTimeMicros() {
-        return timeMicros;
+    public String getTarget() {
+        return target;
     }
 
     @Override
     public String toString() {
         return "Action{" +
-                "type=" + type +
+                "timestampMicros=" + timestampMicros +
                 ", orderId='" + orderId + '\'' +
-                ", from=" + from +
-                ", to=" + to +
-                ", timeMicros=" + timeMicros +
+                ", action='" + action + '\'' +
+                ", target='" + target + '\'' +
                 '}';
     }
 }
