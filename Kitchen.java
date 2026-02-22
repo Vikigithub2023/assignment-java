@@ -69,7 +69,7 @@ public class Kitchen {
 
         lock.lock();
         try {
-            StoredOrder storedOrder = allOrders.remove(orderId);
+            StoredOrder storedOrder = allOrders.get(orderId);
             if (storedOrder == null) {
                 return;
             }
@@ -77,15 +77,22 @@ public class Kitchen {
             long nowMicros = nowMicros();
             StorageType storageType = storedOrder.getStorageType();
 
+            storedOrder.updateFreshness(nowMicros);
+            boolean expired = !storedOrder.isActive();
+
             if (storageType == StorageType.SHELF) {
                 shelf.removeOrder(orderId);
-                ledger.add(new Action(nowMicros, orderId, "pickup", StorageType.SHELF.name()));
-                return;
+            } else {
+                removeFromListById(storageList(storageType), orderId);
             }
 
-            removeFromListById(storageList(storageType), orderId);
-            storedOrder.deactivate();
-            ledger.add(new Action(nowMicros, orderId, "pickup", storageType.name()));
+            allOrders.remove(orderId);
+
+            if (expired) {
+                ledger.add(new Action(nowMicros, orderId, "discard", storageType.name()));
+            } else {
+                ledger.add(new Action(nowMicros, orderId, "pickup", storageType.name()));
+            }
         } finally {
             lock.unlock();
         }
