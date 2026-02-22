@@ -19,6 +19,21 @@ public class StoredOrder {
         this.active = true;
     }
 
+    public StoredOrder(
+            Order order,
+            StorageType storageType,
+            long placedTimeMicros,
+            long lastUpdatedMicros,
+            double remainingFreshnessMicros
+    ) {
+        this.order = Objects.requireNonNull(order, "order");
+        this.storageType = Objects.requireNonNull(storageType, "storageType");
+        this.placedTimeMicros = placedTimeMicros;
+        this.lastUpdatedMicros = lastUpdatedMicros;
+        this.remainingFreshnessMicros = remainingFreshnessMicros;
+        this.active = true;
+    }
+
     public Order getOrder() {
         return order;
     }
@@ -41,6 +56,10 @@ public class StoredOrder {
 
     public boolean isActive() {
         return active;
+    }
+
+    public void deactivate() {
+        this.active = false;
     }
 
     public void updateFreshness(long currentMicros) {

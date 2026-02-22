@@ -9,11 +9,16 @@ public enum StorageType {
             return false;
         }
 
-        return switch (this) {
-            case HEATER -> order.getTemperature() == Order.Temperature.HOT;
-            case COOLER -> order.getTemperature() == Order.Temperature.COLD;
-            case FREEZER -> order.getTemperature() == Order.Temperature.FROZEN;
-            case SHELF -> false;
-        };
+        switch (this) {
+            case HEATER:
+                return order.getTemperature() == Order.Temperature.HOT;
+            case COOLER:
+                return order.getTemperature() == Order.Temperature.COLD;
+            case FREEZER:
+                return order.getTemperature() == Order.Temperature.FROZEN;
+            case SHELF:
+            default:
+                return false;
+        }
     }
 }
