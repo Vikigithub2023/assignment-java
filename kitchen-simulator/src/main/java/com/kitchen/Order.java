@@ -1,14 +1,12 @@
 package com.kitchen;
 
-import com.fasterxml.jackson.annotation.JsonCreator;
-import com.fasterxml.jackson.annotation.JsonProperty;
-
 import java.util.Objects;
 
 public class Order {
     public enum Temperature {
         HOT,
         COLD,
+        ROOM,
         FROZEN
     }
 
@@ -18,15 +16,13 @@ public class Order {
     private final int shelfLifeSeconds;
     private final double decayRate;
 
-    @JsonCreator
     public Order(
-            @JsonProperty("id") String id,
-            @JsonProperty("name") String name,
-            @JsonProperty("temp") Temperature temperature,
-            @JsonProperty("shelfLife") int shelfLifeSeconds,
-            @JsonProperty("decayRate") double decayRate
+            String id,
+            String name,
+            Temperature temperature,
+            int shelfLifeSeconds,
+            double decayRate
     ) {
-        // Some payloads use "temperature"/"shelfLifeSeconds" instead; Main handles those cases.
         this.id = Objects.requireNonNull(id, "id");
         this.name = Objects.requireNonNull(name, "name");
         this.temperature = Objects.requireNonNull(temperature, "temperature");
@@ -65,4 +61,3 @@ public class Order {
                 '}';
     }
 }
-

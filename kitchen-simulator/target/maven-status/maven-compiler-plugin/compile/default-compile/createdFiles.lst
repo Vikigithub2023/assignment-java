@@ -5,7 +5,7 @@ com/kitchen/Main$1.class
 com/kitchen/Order$Temperature.class
 com/kitchen/StorageType.class
 com/kitchen/Main.class
+com/kitchen/Main$OrdersResponse.class
 com/kitchen/Order.class
 com/kitchen/StorageType$1.class
 com/kitchen/ShelfManager.class
-com/kitchen/Main$2.class

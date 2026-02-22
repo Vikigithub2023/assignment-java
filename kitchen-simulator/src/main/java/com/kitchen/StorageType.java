@@ -19,9 +19,9 @@ public enum StorageType {
             case FREEZER:
                 return order.getTemperature() == Order.Temperature.FROZEN;
             case SHELF:
+                return order.getTemperature() == Order.Temperature.ROOM;
             default:
                 return false;
         }
     }
 }
-

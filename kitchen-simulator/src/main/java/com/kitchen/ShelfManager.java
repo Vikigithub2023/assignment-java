@@ -5,15 +5,22 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.PriorityQueue;
 import java.util.concurrent.TimeUnit;
+import java.util.function.LongSupplier;
 
 public class ShelfManager {
     private final int capacity;
+    private final LongSupplier nowMicros;
 
     private final PriorityQueue<StoredOrder> expiringHeap;
     private final Map<String, StoredOrder> orderMap;
 
     public ShelfManager(int capacity) {
+        this(capacity, () -> TimeUnit.NANOSECONDS.toMicros(System.nanoTime()));
+    }
+
+    public ShelfManager(int capacity, LongSupplier nowMicros) {
         this.capacity = capacity;
+        this.nowMicros = nowMicros;
         this.expiringHeap = new PriorityQueue<>(Comparator.comparingLong(ShelfManager::estimatedExpirationMicros));
         this.orderMap = new HashMap<>();
     }
@@ -44,7 +51,7 @@ public class ShelfManager {
     }
 
     public StoredOrder pollNextToExpire() {
-        long nowMicros = nowMicros();
+        long nowMicros = this.nowMicros.getAsLong();
 
         while (!expiringHeap.isEmpty()) {
             StoredOrder next = expiringHeap.poll();
@@ -108,9 +115,4 @@ public class ShelfManager {
         long candidate = lastUpdated + delta;
         return candidate < lastUpdated ? Long.MAX_VALUE : candidate;
     }
-
-    private static long nowMicros() {
-        return TimeUnit.NANOSECONDS.toMicros(System.nanoTime());
-    }
 }
-

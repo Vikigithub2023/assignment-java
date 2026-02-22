@@ -1,24 +1,24 @@
 package com.kitchen;
 
 public class Action {
-    private final long timestampMicros;
-    private final String orderId;
+    private final long timestamp;
+    private final String id;
     private final String action;
     private final String target;
 
-    public Action(long timestampMicros, String orderId, String action, String target) {
-        this.timestampMicros = timestampMicros;
-        this.orderId = orderId;
+    public Action(long timestamp, String id, String action, String target) {
+        this.timestamp = timestamp;
+        this.id = id;
         this.action = action;
         this.target = target;
     }
 
-    public long getTimestampMicros() {
-        return timestampMicros;
+    public long getTimestamp() {
+        return timestamp;
     }
 
-    public String getOrderId() {
-        return orderId;
+    public String getId() {
+        return id;
     }
 
     public String getAction() {
@@ -32,11 +32,10 @@ public class Action {
     @Override
     public String toString() {
         return "Action{" +
-                "timestampMicros=" + timestampMicros +
-                ", orderId='" + orderId + '\'' +
+                "timestamp=" + timestamp +
+                ", id='" + id + '\'' +
                 ", action='" + action + '\'' +
                 ", target='" + target + '\'' +
                 '}';
     }
 }
-

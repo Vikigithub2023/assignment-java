@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuite xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://maven.apache.org/surefire/maven-surefire-plugin/xsd/surefire-test-report.xsd" version="3.0.2" name="com.kitchen.KitchenTest" time="0.033" tests="6" errors="0" skipped="0" failures="0">
+<testsuite xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://maven.apache.org/surefire/maven-surefire-plugin/xsd/surefire-test-report.xsd" version="3.0.2" name="com.kitchen.StoredOrderTest" time="0.04" tests="3" errors="0" skipped="0" failures="0">
   <properties>
     <property name="awt.toolkit" value="sun.awt.X11.XToolkit"/>
     <property name="java.specification.version" value="11"/>
@@ -56,10 +56,7 @@
     <property name="sun.io.unicode.encoding" value="UnicodeLittle"/>
     <property name="java.class.version" value="55.0"/>
   </properties>
-  <testcase name="placeThenPickup_logsActions" classname="com.kitchen.KitchenTest" time="0.002"/>
-  <testcase name="place_movesHotFromShelfToHeater_thenPlacesNewOrder" classname="com.kitchen.KitchenTest" time="0.025"/>
-  <testcase name="pickup_missing_doesNothing" classname="com.kitchen.KitchenTest" time="0.001"/>
-  <testcase name="pickup_discards_whenExpired" classname="com.kitchen.KitchenTest" time="0.0"/>
-  <testcase name="place_discardsFromShelf_whenNoMovesPossible_thenPlacesNewOrder" classname="com.kitchen.KitchenTest" time="0.001"/>
-  <testcase name="place_goesToShelf_whenIdealFull" classname="com.kitchen.KitchenTest" time="0.001"/>
+  <testcase name="updateFreshness_idealStorage_decays1x" classname="com.kitchen.StoredOrderTest" time="0.018"/>
+  <testcase name="updateFreshness_marksInactive_whenExpired" classname="com.kitchen.StoredOrderTest" time="0.002"/>
+  <testcase name="updateFreshness_shelf_decays2x" classname="com.kitchen.StoredOrderTest" time="0.002"/>
 </testsuite>
