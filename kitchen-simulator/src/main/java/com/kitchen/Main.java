@@ -21,6 +21,7 @@ import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.stream.Collectors;
 
 public class Main {
     private static final ObjectMapper MAPPER = new ObjectMapper();
@@ -108,7 +109,7 @@ public class Main {
         }
 
         return MAPPER.convertValue(ordersNode, new TypeReference<List<Map<String, Object>>>() {
-        }).stream().map(Main::orderFromMap).toList();
+        }).stream().map(Main::orderFromMap).collect(Collectors.toList());
     }
 
     private static void postSolution(HttpClient http, String solveUrl, List<Action> actions) throws IOException, InterruptedException {
@@ -226,4 +227,3 @@ public class Main {
         return v;
     }
 }
-
